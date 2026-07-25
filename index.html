@@ -42,6 +42,56 @@
     max-width: 900px;
     margin: 0 auto;
   }
+  .section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #444;
+    margin: 0 0 8px;
+  }
+  .time-input-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+  }
+  .time-input-row label {
+    font-size: 13px;
+    color: #555;
+    font-weight: 600;
+  }
+  .time-input-row input[type="number"] {
+    width: 80px;
+    padding: 6px 8px;
+    font-size: 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-align: center;
+  }
+  .quick-minutes {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .quick-minutes button {
+    border: 1px solid var(--border);
+    background: #f2f2f2;
+    color: #555;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .quick-minutes button.active {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
   .summary {
     display: flex;
     gap: 12px;
@@ -206,9 +256,12 @@
   }
   footer .credit {
     display: block;
-    margin-top: 4px;
-    font-size: 10px;
-    color: #bbb;
+    margin-top: 8px;
+  }
+  .mog-logo-img {
+    height: 28px;
+    width: auto;
+    opacity: 0.9;
   }
   @media (max-width: 600px) {
     thead { display: none; }
@@ -245,29 +298,42 @@
   <h1>兵器工場イベント 継続占領ポイント計算ツール</h1>
   <div class="subtitle">各軍事施設の占領状況を選択して、同盟の継続占領ポイント(Pt・分)を味方・敵で比較します</div>
 
+  <div class="time-input-row">
+    <label for="minutesInput">経過時間(分)</label>
+    <input type="number" id="minutesInput" min="0" value="1">
+    <div class="quick-minutes" id="quickMinutes">
+      <button data-min="1">1分</button>
+      <button data-min="5">5分</button>
+      <button data-min="10">10分</button>
+      <button data-min="30">30分</button>
+      <button data-min="45">45分</button>
+    </div>
+  </div>
+
+  <div class="section-title" id="nSectionTitle">10分経過時点のポイント</div>
   <div class="summary">
     <div class="summary-card ally">
-      <div class="label">味方 合計継続Pt</div>
-      <div class="value" id="allyTotal">0</div>
+      <div class="label">味方 合計Pt</div>
+      <div class="value" id="allyTotalN">0</div>
     </div>
     <div class="summary-card enemy">
-      <div class="label">敵 合計継続Pt</div>
-      <div class="value" id="enemyTotal">0</div>
+      <div class="label">敵 合計Pt</div>
+      <div class="value" id="enemyTotalN">0</div>
     </div>
     <div class="summary-card diff">
       <div class="label">差分(味方 - 敵)</div>
-      <div class="value" id="diffTotal">0</div>
+      <div class="value" id="diffTotalN">0</div>
     </div>
   </div>
 
   <div class="diff-bar-wrap">
     <div class="diff-bar-labels">
-      <span id="allyBarLabel">味方 0Pt</span>
-      <span id="enemyBarLabel">敵 0Pt</span>
+      <span id="allyBarLabelN">味方 0Pt</span>
+      <span id="enemyBarLabelN">敵 0Pt</span>
     </div>
     <div class="diff-bar">
-      <div class="ally-seg" id="allySeg" style="width:50%"></div>
-      <div class="enemy-seg" id="enemySeg" style="width:50%"></div>
+      <div class="ally-seg" id="allySegN" style="width:50%"></div>
+      <div class="enemy-seg" id="enemySegN" style="width:50%"></div>
     </div>
   </div>
 
@@ -289,7 +355,9 @@
 
   <footer>
     データ出典: 兵器工場イベント一覧(同盟・継続占領Ptのみ使用)
-    <span class="credit">made by MOG</span>
+    <span class="credit">
+      <img src="mog-logo.png" alt="MOG" class="mog-logo-img">
+    </span>
   </footer>
 </div>
 
@@ -311,6 +379,8 @@ const facilities = [
 
 const state = {};
 facilities.forEach(f => { state[f.id] = { status: "none", customPt: 0 }; });
+
+let minutes = 1;
 
 function getPt(f) {
   return f.custom ? (Number(state[f.id].customPt) || 0) : f.pt;
@@ -405,20 +475,24 @@ function updateSummary() {
     if (state[f.id].status === "ally") allyTotal += pt;
     if (state[f.id].status === "enemy") enemyTotal += pt;
   });
-  document.getElementById("allyTotal").textContent = allyTotal.toLocaleString();
-  document.getElementById("enemyTotal").textContent = enemyTotal.toLocaleString();
-  const diff = allyTotal - enemyTotal;
-  const diffEl = document.getElementById("diffTotal");
-  diffEl.textContent = (diff > 0 ? "+" : "") + diff.toLocaleString();
-  diffEl.style.color = diff > 0 ? "var(--ally)" : (diff < 0 ? "var(--enemy)" : "#333");
+  // N分経過時点のポイント = レート(Pt/分) × 経過時間(分)
+  const allyTotalN = allyTotal * minutes;
+  const enemyTotalN = enemyTotal * minutes;
+  document.getElementById("nSectionTitle").textContent = `${minutes}分経過時点のポイント`;
+  document.getElementById("allyTotalN").textContent = allyTotalN.toLocaleString();
+  document.getElementById("enemyTotalN").textContent = enemyTotalN.toLocaleString();
+  const diffN = allyTotalN - enemyTotalN;
+  const diffNEl = document.getElementById("diffTotalN");
+  diffNEl.textContent = (diffN > 0 ? "+" : "") + diffN.toLocaleString();
+  diffNEl.style.color = diffN > 0 ? "var(--ally)" : (diffN < 0 ? "var(--enemy)" : "#333");
 
-  document.getElementById("allyBarLabel").textContent = `味方 ${allyTotal.toLocaleString()}Pt`;
-  document.getElementById("enemyBarLabel").textContent = `敵 ${enemyTotal.toLocaleString()}Pt`;
-  const total = allyTotal + enemyTotal;
-  const allyPct = total === 0 ? 50 : (allyTotal / total) * 100;
-  const enemyPct = 100 - allyPct;
-  document.getElementById("allySeg").style.width = allyPct + "%";
-  document.getElementById("enemySeg").style.width = enemyPct + "%";
+  document.getElementById("allyBarLabelN").textContent = `味方 ${allyTotalN.toLocaleString()}Pt`;
+  document.getElementById("enemyBarLabelN").textContent = `敵 ${enemyTotalN.toLocaleString()}Pt`;
+  const totalN = allyTotalN + enemyTotalN;
+  const allyPctN = totalN === 0 ? 50 : (allyTotalN / totalN) * 100;
+  const enemyPctN = 100 - allyPctN;
+  document.getElementById("allySegN").style.width = allyPctN + "%";
+  document.getElementById("enemySegN").style.width = enemyPctN + "%";
 }
 
 document.getElementById("resetBtn").addEventListener("click", () => {
@@ -426,6 +500,31 @@ document.getElementById("resetBtn").addEventListener("click", () => {
   render();
 });
 
+const minutesInput = document.getElementById("minutesInput");
+const quickMinutes = document.getElementById("quickMinutes");
+
+function setActiveQuickButton() {
+  quickMinutes.querySelectorAll("button").forEach(btn => {
+    btn.classList.toggle("active", Number(btn.getAttribute("data-min")) === minutes);
+  });
+}
+
+minutesInput.addEventListener("input", () => {
+  minutes = Math.max(0, Number(minutesInput.value) || 0);
+  setActiveQuickButton();
+  updateSummary();
+});
+
+quickMinutes.querySelectorAll("button").forEach(btn => {
+  btn.addEventListener("click", () => {
+    minutes = Number(btn.getAttribute("data-min"));
+    minutesInput.value = minutes;
+    setActiveQuickButton();
+    updateSummary();
+  });
+});
+
+setActiveQuickButton();
 render();
 </script>
 </body>
