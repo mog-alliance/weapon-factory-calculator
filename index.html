@@ -269,6 +269,37 @@
     width: 1px;
     height: 1px;
   }
+  .reversal-box {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .reversal-status { margin-bottom: 8px; }
+  .reversal-status.win { color: var(--ally); font-weight: 700; }
+  .reversal-status.lose { color: #444; }
+  .reversal-note {
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 8px;
+  }
+  .reversal-combo-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #444;
+  }
+  .reversal-list {
+    margin: 0;
+    padding-left: 18px;
+  }
+  .reversal-list li { margin-bottom: 2px; }
+  .reversal-tag {
+    color: #888;
+    font-size: 12px;
+  }
   footer {
     text-align: center;
     font-size: 11px;
@@ -376,6 +407,18 @@
   </div>
 
   <textarea id="copyTextarea" class="copy-textarea" readonly></textarea>
+
+  <div class="section-title">逆転ラインの目安</div>
+  <div class="reversal-note">※上の表は簡易計算のため、実際の点差を入力してください</div>
+  <div class="time-input-row">
+    <label for="gapInput">敵との点差(敵 - 味方)</label>
+    <input type="number" id="gapInput" value="0">
+  </div>
+  <div class="time-input-row">
+    <label for="remainingInput">残り時間(分)</label>
+    <input type="number" id="remainingInput" min="0" value="30">
+  </div>
+  <div class="reversal-box" id="reversalBox"></div>
 
   <footer>
     データ出典: 兵器工場イベント一覧(同盟・継続占領Ptのみ使用)
@@ -517,6 +560,75 @@ function updateSummary() {
   const enemyPctN = 100 - allyPctN;
   document.getElementById("allySegN").style.width = allyPctN + "%";
   document.getElementById("enemySegN").style.width = enemyPctN + "%";
+
+  updateReversal();
+}
+
+// 残り時間から、逆転(または現在のリードを守る)のために必要なレート差の目安を計算
+// ※攻撃(弾)による直接ダメージ等は考慮しない、あくまで施設の継続ポイントのみの目安
+// 「敵との点差」欄は上の表とは連動せず、常に手入力の値をそのまま使う
+function updateReversal() {
+  const box = document.getElementById("reversalBox");
+  if (!box) return;
+
+  const gap = Number(gapInput.value) || 0; // 敵 - 味方(プラス=負けている)
+  const remaining = Math.max(0, Number(remainingInput.value) || 0);
+
+  if (gap <= 0) {
+    const lead = gap === 0 ? 0 : -gap;
+    box.innerHTML = `
+      <div class="reversal-status win">現在 味方が +${lead.toLocaleString()}Pt リード中です。このまま残り${remaining}分を維持できれば勝利です。</div>
+      <div class="reversal-note">※施設の継続ポイントのみで計算した目安です(攻撃等は含みません)</div>
+    `;
+    return;
+  }
+
+  if (remaining <= 0) {
+    box.innerHTML = `
+      <div class="reversal-status lose">残り時間が0分のため、これ以上の逆転はできません(現在 敵+${gap.toLocaleString()}Pt差)。</div>
+    `;
+    return;
+  }
+  const neededRate = Math.ceil(gap / remaining);
+
+  // 味方が占領していない施設を、奪取した場合の差分への貢献度(スイング)順に並べる
+  // 未占領から占領: +pt / 敵から奪取: +pt×2(敵の加算が止まり、味方の加算が始まるため)
+  const candidates = facilities
+    .filter(f => state[f.id].status !== "ally")
+    .map(f => {
+      const pt = getPt(f);
+      const swing = state[f.id].status === "enemy" ? pt * 2 : pt;
+      return { name: f.name, status: state[f.id].status, swing };
+    })
+    .filter(c => c.swing > 0)
+    .sort((a, b) => b.swing - a.swing);
+
+  let acc = 0;
+  const combo = [];
+  for (const c of candidates) {
+    if (acc >= neededRate) break;
+    combo.push(c);
+    acc += c.swing;
+  }
+  const achievable = acc >= neededRate;
+
+  let html = `
+    <div class="reversal-status lose">現在 敵が +${gap.toLocaleString()}Pt リード中(残り${remaining}分)。追いつくには毎分あと <strong>${neededRate.toLocaleString()}Pt</strong> ぶんのレート差が必要です。</div>
+    <div class="reversal-note">※施設の継続ポイントのみで計算した目安です(攻撃等は含みません)</div>
+  `;
+
+  if (combo.length) {
+    html += `<div class="reversal-combo-title">${achievable ? "この施設を占領できれば逆転ラインに到達(目安)" : "全て取っても届きませんが、最大の組み合わせ"}(合計 +${acc.toLocaleString()}Pt/分):</div><ul class="reversal-list">`;
+    combo.forEach(c => {
+      const tag = c.status === "enemy" ? "敵から奪取" : "新規占領";
+      html += `<li>${c.name} <span class="reversal-tag">(${tag} +${c.swing}Pt/分)</span></li>`;
+    });
+    html += `</ul>`;
+  } else {
+    html += `<div class="reversal-combo-title">味方が占領していない施設がありません。</div>`;
+  }
+
+  box.innerHTML = html;
 }
 
 document.getElementById("resetBtn").addEventListener("click", () => {
@@ -612,6 +724,16 @@ quickMinutes.querySelectorAll("button").forEach(btn => {
     setActiveQuickButton();
     updateSummary();
   });
+});
+
+const remainingInput = document.getElementById("remainingInput");
+remainingInput.addEventListener("input", () => {
+  render();
+});
+
+const gapInput = document.getElementById("gapInput");
+gapInput.addEventListener("input", () => {
+  updateReversal();
 });
 
 setActiveQuickButton();
