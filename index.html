@@ -237,6 +237,10 @@
   .reset-row {
     text-align: center;
     margin: 16px 0 30px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
   }
   .reset-row button {
     background: #fff;
@@ -248,6 +252,23 @@
     color: #555;
   }
   .reset-row button:hover { background: #f2f2f2; }
+  #copyBtn {
+    background: var(--blue);
+    border-color: var(--blue);
+    color: #fff;
+  }
+  #copyBtn:hover { background: #3a63b8; }
+  #copyBtn.copied {
+    background: #2e9e5b;
+    border-color: #2e9e5b;
+  }
+  .copy-textarea {
+    position: absolute;
+    left: -9999px;
+    top: -9999px;
+    width: 1px;
+    height: 1px;
+  }
   footer {
     text-align: center;
     font-size: 11px;
@@ -259,7 +280,7 @@
     margin-top: 8px;
   }
   .mog-logo-img {
-    height: 56px;
+    height: 72px;
     width: auto;
     opacity: 0.9;
   }
@@ -351,7 +372,10 @@
 
   <div class="reset-row">
     <button id="resetBtn">すべて未占領にリセット</button>
+    <button id="copyBtn">占領状況をコピー</button>
   </div>
+
+  <textarea id="copyTextarea" class="copy-textarea" readonly></textarea>
 
   <footer>
     データ出典: 兵器工場イベント一覧(同盟・継続占領Ptのみ使用)
@@ -498,6 +522,72 @@ function updateSummary() {
 document.getElementById("resetBtn").addEventListener("click", () => {
   facilities.forEach(f => { state[f.id].status = "none"; });
   render();
+});
+
+function buildSummaryText() {
+  const allyList = [];
+  const enemyList = [];
+  let allyRate = 0, enemyRate = 0;
+  facilities.forEach(f => {
+    const pt = getPt(f);
+    if (state[f.id].status === "ally") { allyList.push(`・${f.name}(${pt}Pt/分)`); allyRate += pt; }
+    else if (state[f.id].status === "enemy") { enemyList.push(`・${f.name}(${pt}Pt/分)`); enemyRate += pt; }
+  });
+  const allyTotalN = allyRate * minutes;
+  const enemyTotalN = enemyRate * minutes;
+  const diffN = allyTotalN - enemyTotalN;
+
+  const lines = [];
+  lines.push("【兵器工場 占領状況】");
+  lines.push("");
+  lines.push(`■味方占領(${allyList.length}施設)`);
+  lines.push(...(allyList.length ? allyList : ["(なし)"]));
+  lines.push("");
+  lines.push(`■敵占領(${enemyList.length}施設)`);
+  lines.push(...(enemyList.length ? enemyList : ["(なし)"]));
+  lines.push("");
+  lines.push(`${minutes}分経過時点: 味方 ${allyTotalN.toLocaleString()}Pt / 敵 ${enemyTotalN.toLocaleString()}Pt`);
+  lines.push(`差分: ${diffN > 0 ? "+" : ""}${diffN.toLocaleString()}Pt`);
+  return lines.join("\n");
+}
+
+const copyBtn = document.getElementById("copyBtn");
+const copyTextarea = document.getElementById("copyTextarea");
+
+copyBtn.addEventListener("click", () => {
+  const text = buildSummaryText();
+  const showCopied = () => {
+    const original = "占領状況をコピー";
+    copyBtn.textContent = "コピーしました!";
+    copyBtn.classList.add("copied");
+    setTimeout(() => {
+      copyBtn.textContent = original;
+      copyBtn.classList.remove("copied");
+    }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(showCopied).catch(() => {
+      copyTextarea.value = text;
+      copyTextarea.style.left = "0";
+      copyTextarea.style.top = "0";
+      copyTextarea.focus();
+      copyTextarea.select();
+      document.execCommand("copy");
+      copyTextarea.style.left = "-9999px";
+      copyTextarea.style.top = "-9999px";
+      showCopied();
+    });
+  } else {
+    copyTextarea.value = text;
+    copyTextarea.style.left = "0";
+    copyTextarea.style.top = "0";
+    copyTextarea.focus();
+    copyTextarea.select();
+    document.execCommand("copy");
+    copyTextarea.style.left = "-9999px";
+    copyTextarea.style.top = "-9999px";
+    showCopied();
+  }
 });
 
 const minutesInput = document.getElementById("minutesInput");
