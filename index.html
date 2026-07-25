@@ -645,7 +645,7 @@ function updateReversal() {
     const lead = gap === 0 ? 0 : -gap;
     box.innerHTML = `
       <div class="reversal-status win">現在 味方が +${lead.toLocaleString()}Pt リード中です。このまま残り${remaining}分を維持できれば勝利です。</div>
-      <div class="reversal-note">※施設の継続ポイントのみで計算した目安です(攻撃等は含みません)</div>
+      <div class="reversal-note">※施設の継続ポイントのみで計算した目安です(採取・弾丸の収集は含みません)</div>
     `;
     return;
   }
@@ -681,7 +681,7 @@ function updateReversal() {
 
   let html = `
     <div class="reversal-status lose">現在 敵が +${gap.toLocaleString()}Pt リード中(残り${remaining}分)。追いつくには毎分あと <strong>${neededRate.toLocaleString()}Pt</strong> ぶんのレート差が必要です。</div>
-    <div class="reversal-note">※施設の継続ポイントのみで計算した目安です(攻撃等は含みません)</div>
+    <div class="reversal-note">※施設の継続ポイントのみで計算した目安です(採取・弾丸の収集は含みません)</div>
   `;
 
   if (combo.length) {
