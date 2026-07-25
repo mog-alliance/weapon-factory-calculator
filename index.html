@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>兵器工場イベント 継続占領ポイント計算ツール</title>
+<style>
+  :root {
+    color-scheme: light;
+    --blue: #4472c4;
+    --blue-light: #d9e2f3;
+    --yellow: #ffe699;
+    --yellow-light: #fff6dc;
+    --ally: #2e6bd6;
+    --enemy: #d64545;
+    --neutral: #999;
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --border: #dbe1ec;
+    --text: #222;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", sans-serif;
+  }
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+    text-align: center;
+  }
+  .subtitle {
+    text-align: center;
+    color: #666;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .summary {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  .summary-card {
+    flex: 1;
+    min-width: 140px;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    text-align: center;
+  }
+  .summary-card .label {
+    font-size: 12px;
+    color: #777;
+    margin-bottom: 6px;
+  }
+  .summary-card .value {
+    font-size: 26px;
+    font-weight: 700;
+  }
+  .summary-card.ally .value { color: var(--ally); }
+  .summary-card.enemy .value { color: var(--enemy); }
+  .summary-card.diff .value { color: #333; }
+  .diff-bar-wrap {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 14px 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    margin-bottom: 20px;
+  }
+  .diff-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    margin-bottom: 6px;
+    color: #555;
+  }
+  .diff-bar {
+    display: flex;
+    height: 22px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #eee;
+  }
+  .diff-bar .ally-seg {
+    background: var(--ally);
+    transition: width 0.25s ease;
+  }
+  .diff-bar .enemy-seg {
+    background: var(--enemy);
+    transition: width 0.25s ease;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  thead th {
+    background: var(--blue);
+    color: #fff;
+    font-size: 13px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  tbody td {
+    padding: 10px 8px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    text-align: center;
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:nth-child(odd) { background: #fafbff; }
+  .facility-name {
+    text-align: left !important;
+    font-weight: 600;
+    padding-left: 14px !important;
+  }
+  .facility-note {
+    display: block;
+    font-weight: 400;
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+  }
+  .pt {
+    font-variant-numeric: tabular-nums;
+    color: #444;
+    font-size: 12px;
+  }
+  .status-group {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .status-group button {
+    border: none;
+    background: #f2f2f2;
+    padding: 6px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #555;
+    white-space: nowrap;
+  }
+  .status-group button + button {
+    border-left: 1px solid var(--border);
+  }
+  .status-group button.active[data-status="ally"] {
+    background: var(--ally);
+    color: #fff;
+  }
+  .status-group button.active[data-status="none"] {
+    background: var(--neutral);
+    color: #fff;
+  }
+  .status-group button.active[data-status="enemy"] {
+    background: var(--enemy);
+    color: #fff;
+  }
+  .custom-pt-input {
+    width: 70px;
+    padding: 4px 6px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-align: right;
+  }
+  .contrib {
+    font-weight: 700;
+    font-size: 13px;
+  }
+  .contrib.ally { color: var(--ally); }
+  .contrib.enemy { color: var(--enemy); }
+  .contrib.none { color: #bbb; }
+  .reset-row {
+    text-align: center;
+    margin: 16px 0 30px;
+  }
+  .reset-row button {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 13px;
+    cursor: pointer;
+    color: #555;
+  }
+  .reset-row button:hover { background: #f2f2f2; }
+  footer {
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    margin-top: 10px;
+  }
+  footer .credit {
+    display: block;
+    margin-top: 4px;
+    font-size: 10px;
+    color: #bbb;
+  }
+  @media (max-width: 600px) {
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tbody tr {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      padding: 8px 0;
+    }
+    tbody td {
+      border-bottom: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 14px;
+    }
+    tbody td.facility-name {
+      font-size: 14px;
+      display: block;
+    }
+    tbody td::before {
+      content: attr(data-label);
+      font-size: 11px;
+      color: #999;
+      font-weight: 400;
+    }
+    tbody td.facility-name::before { content: none; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>兵器工場イベント 継続占領ポイント計算ツール</h1>
+  <div class="subtitle">各軍事施設の占領状況を選択して、同盟の継続占領ポイント(Pt・分)を味方・敵で比較します</div>
+
+  <div class="summary">
+    <div class="summary-card ally">
+      <div class="label">味方 合計継続Pt</div>
+      <div class="value" id="allyTotal">0</div>
+    </div>
+    <div class="summary-card enemy">
+      <div class="label">敵 合計継続Pt</div>
+      <div class="value" id="enemyTotal">0</div>
+    </div>
+    <div class="summary-card diff">
+      <div class="label">差分(味方 - 敵)</div>
+      <div class="value" id="diffTotal">0</div>
+    </div>
+  </div>
+
+  <div class="diff-bar-wrap">
+    <div class="diff-bar-labels">
+      <span id="allyBarLabel">味方 0Pt</span>
+      <span id="enemyBarLabel">敵 0Pt</span>
+    </div>
+    <div class="diff-bar">
+      <div class="ally-seg" id="allySeg" style="width:50%"></div>
+      <div class="enemy-seg" id="enemySeg" style="width:50%"></div>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:26%">軍事施設名</th>
+        <th style="width:14%">同盟 継続Pt</th>
+        <th style="width:34%">占領状況</th>
+        <th style="width:12%">寄与ポイント</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <div class="reset-row">
+    <button id="resetBtn">すべて未占領にリセット</button>
+  </div>
+
+  <footer>
+    データ出典: 兵器工場イベント一覧(同盟・継続占領Ptのみ使用)
+    <span class="credit">made by MOG</span>
+  </footer>
+</div>
+
+<script>
+// 施設データ: 継続占領の「同盟」ポイント(Pt・分)のみを使用
+const facilities = [
+  { id: "royal",     name: "王室兵器工場",     pt: 1800, note: "最も高いポイントを獲得できる建物" },
+  { id: "test1",     name: "武器試験場(第一)", pt: 1200, note: "" },
+  { id: "test2",     name: "武器試験場(第二)", pt: 1200, note: "" },
+  { id: "repair1",   name: "武器修理工場(第一)", pt: 600, note: "" },
+  { id: "repair2",   name: "武器修理工場(第二)", pt: 600, note: "" },
+  { id: "repair3",   name: "武器修理工場(第三)", pt: 600, note: "" },
+  { id: "repair4",   name: "武器修理工場(第四)", pt: 600, note: "" },
+  { id: "relay",     name: "中継所",           pt: 240,  note: "無料上級都市移転の回復時間を50%" },
+  { id: "boiler",    name: "スチームボイラー", pt: 240,  note: "軍事施設の占領所要時間を50%" },
+  { id: "mercenary", name: "傭兵野営地",       pt: 240,  note: "強力な傭兵を派遣して敵の建物を攻撃" },
+  { id: "warehouse", name: "兵器倉庫",         pt: 240,  note: "自攻撃力15%増、敵防御力15%減" },
+];
+
+const state = {};
+facilities.forEach(f => { state[f.id] = { status: "none", customPt: 0 }; });
+
+function getPt(f) {
+  return f.custom ? (Number(state[f.id].customPt) || 0) : f.pt;
+}
+
+function render() {
+  const tbody = document.getElementById("tbody");
+  tbody.innerHTML = "";
+  facilities.forEach(f => {
+    const tr = document.createElement("tr");
+
+    const nameTd = document.createElement("td");
+    nameTd.className = "facility-name";
+    nameTd.innerHTML = f.name + (f.note ? `<span class="facility-note">${f.note}</span>` : "");
+    tr.appendChild(nameTd);
+
+    const ptTd = document.createElement("td");
+    ptTd.setAttribute("data-label", "同盟継続Pt");
+    if (f.custom) {
+      ptTd.innerHTML = `<input type="number" min="0" class="custom-pt-input" data-id="${f.id}" value="${state[f.id].customPt}" placeholder="Pt">`;
+    } else {
+      ptTd.innerHTML = `<span class="pt">${f.pt} Pt・分</span>`;
+    }
+    tr.appendChild(ptTd);
+
+    const statusTd = document.createElement("td");
+    statusTd.setAttribute("data-label", "占領状況");
+    statusTd.innerHTML = `
+      <div class="status-group" data-id="${f.id}">
+        <button data-status="ally" class="${state[f.id].status === 'ally' ? 'active' : ''}">占領(味方)</button>
+        <button data-status="none" class="${state[f.id].status === 'none' ? 'active' : ''}">未占領</button>
+        <button data-status="enemy" class="${state[f.id].status === 'enemy' ? 'active' : ''}">敵占領</button>
+      </div>
+    `;
+    tr.appendChild(statusTd);
+
+    const contribTd = document.createElement("td");
+    contribTd.setAttribute("data-label", "寄与ポイント");
+    const pt = getPt(f);
+    const st = state[f.id].status;
+    let contribText = "0";
+    let contribClass = "none";
+    if (st === "ally") { contribText = "+" + pt; contribClass = "ally"; }
+    else if (st === "enemy") { contribText = "-" + pt; contribClass = "enemy"; }
+    contribTd.innerHTML = `<span class="contrib ${contribClass}">${contribText}</span>`;
+    tr.appendChild(contribTd);
+
+    tbody.appendChild(tr);
+  });
+
+  // イベント再バインド
+  tbody.querySelectorAll(".status-group button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.parentElement.getAttribute("data-id");
+      state[id].status = btn.getAttribute("data-status");
+      render();
+    });
+  });
+  tbody.querySelectorAll(".custom-pt-input").forEach(input => {
+    input.addEventListener("input", () => {
+      const id = input.getAttribute("data-id");
+      state[id].customPt = input.value;
+      updateSummary();
+      updateContribOnly();
+    });
+  });
+
+  updateSummary();
+}
+
+function updateContribOnly() {
+  // カスタム入力変更時に寄与ポイント欄だけ更新(全体再描画によるフォーカス喪失を防ぐ)
+  const tbody = document.getElementById("tbody");
+  facilities.forEach((f, idx) => {
+    const tr = tbody.children[idx];
+    const contribSpan = tr.querySelector(".contrib");
+    const pt = getPt(f);
+    const st = state[f.id].status;
+    let contribText = "0";
+    let contribClass = "none";
+    if (st === "ally") { contribText = "+" + pt; contribClass = "ally"; }
+    else if (st === "enemy") { contribText = "-" + pt; contribClass = "enemy"; }
+    contribSpan.textContent = contribText;
+    contribSpan.className = "contrib " + contribClass;
+  });
+}
+
+function updateSummary() {
+  let allyTotal = 0, enemyTotal = 0;
+  facilities.forEach(f => {
+    const pt = getPt(f);
+    if (state[f.id].status === "ally") allyTotal += pt;
+    if (state[f.id].status === "enemy") enemyTotal += pt;
+  });
+  document.getElementById("allyTotal").textContent = allyTotal.toLocaleString();
+  document.getElementById("enemyTotal").textContent = enemyTotal.toLocaleString();
+  const diff = allyTotal - enemyTotal;
+  const diffEl = document.getElementById("diffTotal");
+  diffEl.textContent = (diff > 0 ? "+" : "") + diff.toLocaleString();
+  diffEl.style.color = diff > 0 ? "var(--ally)" : (diff < 0 ? "var(--enemy)" : "#333");
+
+  document.getElementById("allyBarLabel").textContent = `味方 ${allyTotal.toLocaleString()}Pt`;
+  document.getElementById("enemyBarLabel").textContent = `敵 ${enemyTotal.toLocaleString()}Pt`;
+  const total = allyTotal + enemyTotal;
+  const allyPct = total === 0 ? 50 : (allyTotal / total) * 100;
+  const enemyPct = 100 - allyPct;
+  document.getElementById("allySeg").style.width = allyPct + "%";
+  document.getElementById("enemySeg").style.width = enemyPct + "%";
+}
+
+document.getElementById("resetBtn").addEventListener("click", () => {
+  facilities.forEach(f => { state[f.id].status = "none"; });
+  render();
+});
+
+render();
+</script>
+</body>
+</html>
